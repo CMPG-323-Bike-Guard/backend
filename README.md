@@ -1,6 +1,6 @@
-# CampusGuard — Backend
+# BikeGuard — Backend
 
-The API and gate-logic service for **CampusGuard**, NWU's RFID-based bike access control system. This repo owns the registration database, the card/tag pairing check, gate control decisions, and the audit log.
+The API and gate-logic service for **BikeGuard**, NWU's RFID-based bike access control system. This repo owns the registration database, the card/tag pairing check, gate control decisions, and the audit log.
 
 > Web client lives in a separate repo: [`frontend`](../frontend)
 
