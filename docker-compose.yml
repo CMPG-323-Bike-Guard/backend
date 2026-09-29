@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bikeguard
+    ports:
+      - '5432:5432'
+    volumes:
+      - bikeguard_pg_data:/var/lib/postgresql/data
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/bikeguard
+      JWT_SECRET: dev-secret-change-me
+      HMAC_SECRET: dev-hmac-pepper-change-me
+      CORS_ORIGIN: http://localhost:5173
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  bikeguard_pg_data:
