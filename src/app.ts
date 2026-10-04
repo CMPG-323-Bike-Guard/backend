@@ -19,7 +19,8 @@ import devRoutes from './routes/dev.routes';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: config.isProduction ? true : { transport: { target: 'pino-pretty' } },
+  logger: config.isProduction ? true : { transport: { target: 'pino-pretty' } },
+  bodyLimit: 10 * 1024 * 1024, // 10MB — comfortably above the 5MB photo limit the UI advertises, once base64-inflated
   });
 
   await app.register(cors, { origin: config.corsOrigin, credentials: true });
