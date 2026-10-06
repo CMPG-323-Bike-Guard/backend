@@ -16,7 +16,6 @@ import gatesRoutes from './routes/gates.routes';
 import crossingsRoutes from './routes/crossings.routes';
 import alarmsRoutes from './routes/alarms.routes';
 import reportingRoutes from './routes/reporting.routes';
-import cardsRoutes from './routes/cards.routes';
 import devRoutes from './routes/dev.routes';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -43,7 +42,6 @@ export async function buildApp(): Promise<FastifyInstance> {
       await api.register(bikesRoutes);
       await api.register(registrationsRoutes);
       await api.register(tagsRoutes);
-      await api.register(cardsRoutes);
       await api.register(gatesRoutes);
       await api.register(crossingsRoutes);
       await api.register(alarmsRoutes);
