@@ -1,8 +1,12 @@
+import { withTransaction } from '../db';
+import { config } from '../config';
 import { alarmsRepo } from '../repositories/alarms.repo';
 import { auditRepo } from '../repositories/audit.repo';
 import { bikesRepo } from '../repositories/bikes.repo';
 import { cardsRepo } from '../repositories/cards.repo';
+import { eventsRepo } from '../repositories/events.repo';
 import { gatesRepo } from '../repositories/gates.repo';
+import { permissionsRepo } from '../repositories/permissions.repo';
 import { tagsRepo } from '../repositories/tags.repo';
 import { ApiError } from '../errors';
 import { emitRealtime } from '../realtime';
@@ -12,27 +16,79 @@ import type { CrossingView, GateEvent, MismatchReason } from '../types';
 
 export interface CrossingInput {
   gateId: string;
-    cardUid?: string | null;
-    tagUid?: string | null;
+  cardUid?: string | null;
+  tagUid?: string | null;
   source?: 'automated' | 'manual_entry' | 'guard_override';
+  debounce?: boolean;
 }
 
 export interface CrossingOutcome {
   crossing: CrossingView;
   gateShouldOpen: boolean;
   alarmRaised: boolean;
+  duplicate?: boolean;
+}
+
+interface RecentScan {
+  at: number;
+  promise: Promise<CrossingOutcome>;
+}
+
+const recentScans = new Map<string, RecentScan>();
+
+export function clearRecentScans(): void {
+  recentScans.clear();
+}
+
+function scanKey(gateId: string, cardUid: string | null, tagUid: string | null): string {
+  return [gateId, cardUid ? hmacIdentifier(cardUid) : '-', tagUid ? hmacIdentifier(tagUid) : '-'].join('|');
+}
+
+function pruneRecentScans(now: number): void {
+  for (const [key, entry] of recentScans) {
+    if (now - entry.at >= config.scanDebounceMs) recentScans.delete(key);
+  }
 }
 
 export async function processCrossing(input: CrossingInput): Promise<CrossingOutcome> {
+  const cardUid = input.cardUid?.trim() || null;
+  const tagUid = input.tagUid?.trim() || null;
+  const source = input.source ?? 'automated';
+  const debounce = source === 'automated' && input.debounce !== false && config.scanDebounceMs > 0;
+
+  if (!debounce) return evaluateCrossing(input.gateId, cardUid, tagUid, source);
+
+  const now = Date.now();
+  pruneRecentScans(now);
+  const key = scanKey(input.gateId, cardUid, tagUid);
+  const existing = recentScans.get(key);
+  if (existing) {
+    const outcome = await existing.promise;
+    return { ...outcome, duplicate: true };
+  }
+
+  const promise = evaluateCrossing(input.gateId, cardUid, tagUid, source);
+  recentScans.set(key, { at: now, promise });
+  try {
+    return await promise;
+  } catch (err) {
+    recentScans.delete(key);
+    throw err;
+  }
+}
+
+async function evaluateCrossing(
+  gateId: string,
+  cardUid: string | null,
+  tagUid: string | null,
+  source: NonNullable<CrossingInput['source']>,
+): Promise<CrossingOutcome> {
   const startedAt = Date.now();
-  const gate = await gatesRepo.findById(input.gateId);
+  const gate = await gatesRepo.findById(gateId);
   if (!gate) throw ApiError.notFound('That gate is not configured.');
   if (gate.mode === 'manual') {
     throw new ApiError(409, 'gate_manual', 'This gate is in manual mode. Switch it back to automated first.');
   }
-
-  const cardUid = input.cardUid?.trim() || null;
-  const tagUid = input.tagUid?.trim() || null;
 
   let userId: string | null = null;
   let bikeId: string | null = null;
@@ -65,64 +121,54 @@ export async function processCrossing(input: CrossingInput): Promise<CrossingOut
       mismatchReason = 'tag_reported_stolen';
       bikeId = tag.bikeId;
     } else {
-
       const bike = await bikesRepo.findById(tag.bikeId);
-      const ownsIt = !!card && !!bike && card.userId === bike.ownerUserId;
-      const hasPermission = !ownsIt && card && bike ? await hasActivePermission(bike.bikeId, card.userId) : false;
-      if (bike && (ownsIt || hasPermission)) {
-        bikeId = bike.bikeId;
-      } else {
-        mismatchReason = 'tag_registered_to_other_user';
-        bikeId = tag.bikeId;
-      }
+      const cardActive = !!card && card.status === 'active';
+      const ownsIt = cardActive && !!bike && card.userId === bike.ownerUserId;
+      const hasPermission =
+        !ownsIt && cardActive && card && bike ? !!(await permissionsRepo.findActive(bike.bikeId, card.userId)) : false;
+      bikeId = tag.bikeId;
+      if (!bike || !(ownsIt || hasPermission)) mismatchReason = 'tag_registered_to_other_user';
     }
   }
 
   const isMatch = mismatchReason === null;
   const verificationMs = Date.now() - startedAt;
 
-  const { eventsRepo } = await import('../repositories/events.repo');
-  const event: GateEvent = await eventsRepo.create({
-    gateId: gate.gateId,
-    userId,
-    bikeId: isMatch ? bikeId : bikeId,
-    cardRef: cardRefOut,
-    tagRef: tagRefOut,
-    result: isMatch ? 'match' : 'mismatch',
-    mismatchReason,
-    source: input.source ?? 'automated',
-    guardUserId: null,
-    verificationMs,
-    offline: false,
-    note: null,
+  const { event, alarm } = await withTransaction(async () => {
+    const created: GateEvent = await eventsRepo.create({
+      gateId: gate.gateId,
+      userId,
+      bikeId,
+      cardRef: cardRefOut,
+      tagRef: tagRefOut,
+      result: isMatch ? 'match' : 'mismatch',
+      mismatchReason,
+      source,
+      guardUserId: null,
+      verificationMs,
+      offline: false,
+      note: null,
+    });
+
+    const raised = isMatch ? null : await alarmsRepo.create(created.eventId);
+
+    await auditRepo.record({
+      actorUserId: userId,
+      action: isMatch ? 'crossing.match' : 'crossing.mismatch',
+      entityType: 'gate_event',
+      entityId: created.eventId,
+      detail: isMatch
+        ? `Match at ${gate.name} in ${verificationMs}ms.`
+        : `Mismatch at ${gate.name}: ${mismatchReason}.`,
+    });
+
+    return { event: created, alarm: raised };
   });
 
-  let alarmRaised = false;
-  if (!isMatch) {
-    const alarm = await alarmsRepo.create(event.eventId);
-    alarmRaised = true;
-    const alarmView = await buildAlarmView(alarm);
-    emitRealtime({ type: 'alarm', alarm: alarmView });
-  }
-
-  await auditRepo.record({
-    actorUserId: userId,
-    action: isMatch ? 'crossing.match' : 'crossing.mismatch',
-    entityType: 'gate_event',
-    entityId: event.eventId,
-    detail: isMatch
-      ? `Match at ${gate.name} in ${verificationMs}ms.`
-      : `Mismatch at ${gate.name}: ${mismatchReason}.`,
-  });
+  if (alarm) emitRealtime({ type: 'alarm', alarm: await buildAlarmView(alarm) });
 
   const crossing = await toCrossingView(event);
   emitRealtime({ type: 'crossing', crossing });
 
-  return { crossing, gateShouldOpen: isMatch, alarmRaised };
-}
-
-async function hasActivePermission(bikeId: string, authorisedUserId: string): Promise<boolean> {
-  const { permissionsRepo } = await import('../repositories/permissions.repo');
-  const permission = await permissionsRepo.findActive(bikeId, authorisedUserId);
-  return !!permission;
+  return { crossing, gateShouldOpen: isMatch, alarmRaised: alarm !== null };
 }

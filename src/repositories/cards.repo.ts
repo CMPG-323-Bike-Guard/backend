@@ -37,6 +37,10 @@ export const cardsRepo = {
     return toCard(row!);
   },
 
+  async block(cardId: string): Promise<void> {
+    await query("UPDATE cards SET status = 'blocked' WHERE card_id = $1", [cardId]);
+  },
+
   async all(): Promise<Card[]> {
     const rows = await query<CardRow>('SELECT card_id, user_id, card_ref, status FROM cards');
     return rows.map(toCard);

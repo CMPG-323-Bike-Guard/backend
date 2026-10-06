@@ -1,7 +1,20 @@
 import { pool, query } from '../src/db';
 import { displayRef, hashPassword, hmacIdentifier } from '../src/security';
 
+
+
 async function seed() {
+   if (process.argv.includes('--reset')) {
+    console.log('Clearing existing data...');
+    await query('TRUNCATE users, gates, bikes CASCADE');
+  }
+
+  const existing = await query('SELECT 1 FROM users WHERE student_number = $1', ['90003344']);
+  if (existing.length > 0) {
+    console.log('Dev data is already seeded. Run "npm run seed:reset" to wipe and reseed.');
+    await pool.end();
+    return;
+  }
   console.log('Seeding BikeGuard dev data...');
 
   const passwordHash = await hashPassword('Password123!');

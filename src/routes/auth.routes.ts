@@ -1,6 +1,7 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { signToken } from '../auth-plugin';
+import { config } from '../config';
 import { ApiError } from '../errors';
 import { usersRepo } from '../repositories/users.repo';
 import { verifyPassword } from '../security';
@@ -13,7 +14,23 @@ const loginSchema = z.object({
 
 export default async function authRoutes(app: FastifyInstance) {
 
-  app.post('/auth/login', async (request): Promise<Session> => {
+   app.post('/auth/login', {
+    config: {
+      rateLimit: {
+        max: config.loginRateLimitMax,
+        timeWindow: config.loginRateLimitWindow,
+        keyGenerator: (request: FastifyRequest) => {
+          const number = (request.body as { studentStaffNumber?: unknown } | null)?.studentStaffNumber;
+          return `${request.ip}:${typeof number === 'string' ? number.trim() : ''}`;
+        },
+        errorResponseBuilder: (_request: FastifyRequest, context: { after: string }) => ({
+          statusCode: 429,
+          code: 'rate_limited',
+          message: `Too many sign-in attempts. Try again in ${context.after}.`,
+        }),
+      },
+    },
+  }, async (request): Promise<Session> => {
     const body = loginSchema.parse(request.body);
     const user = await usersRepo.findByStudentNumberWithPassword(body.studentStaffNumber);
     if (!user || !(await verifyPassword(body.password, user.passwordHash))) {

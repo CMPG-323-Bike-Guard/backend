@@ -1,4 +1,5 @@
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance } from 'fastify';
 import path from 'node:path';
@@ -15,12 +16,13 @@ import gatesRoutes from './routes/gates.routes';
 import crossingsRoutes from './routes/crossings.routes';
 import alarmsRoutes from './routes/alarms.routes';
 import reportingRoutes from './routes/reporting.routes';
+import cardsRoutes from './routes/cards.routes';
 import devRoutes from './routes/dev.routes';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
-  logger: config.isProduction ? true : { transport: { target: 'pino-pretty' } },
-  bodyLimit: 10 * 1024 * 1024, // 10MB — comfortably above the 5MB photo limit the UI advertises, once base64-inflated
+    logger: config.isProduction ? true : { transport: { target: 'pino-pretty' } },
+    trustProxy: config.trustProxy,
   });
 
   await app.register(cors, { origin: config.corsOrigin, credentials: true });
@@ -28,6 +30,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     root: path.join(process.cwd(), config.uploadsDir),
     prefix: `${config.publicUploadsPath}/`,
   });
+  await app.register(rateLimit, { global: false, hook: 'preHandler' });
   await app.register(authPlugin);
   registerErrorHandler(app);
 
@@ -40,6 +43,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await api.register(bikesRoutes);
       await api.register(registrationsRoutes);
       await api.register(tagsRoutes);
+      await api.register(cardsRoutes);
       await api.register(gatesRoutes);
       await api.register(crossingsRoutes);
       await api.register(alarmsRoutes);

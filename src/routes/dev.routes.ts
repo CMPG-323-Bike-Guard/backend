@@ -7,6 +7,7 @@ const simulateSchema = z.object({
   gateId: z.string().uuid(),
   cardUid: z.string().nullable().optional(),
   tagUid: z.string().nullable().optional(),
+  debounce: z.boolean().default(false),
 });
 
 export default async function devRoutes(app: FastifyInstance) {
@@ -15,6 +16,12 @@ export default async function devRoutes(app: FastifyInstance) {
   app.post('/dev/simulate-crossing', async (request) => {
     request.requireRole('guard', 'admin');
     const body = simulateSchema.parse(request.body);
-    return processCrossing({ gateId: body.gateId, cardUid: body.cardUid, tagUid: body.tagUid, source: 'automated' });
+    return processCrossing({
+      gateId: body.gateId,
+      cardUid: body.cardUid,
+      tagUid: body.tagUid,
+      source: 'automated',
+      debounce: body.debounce,
+    });
   });
 }
