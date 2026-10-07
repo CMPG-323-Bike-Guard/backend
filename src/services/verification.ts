@@ -3,11 +3,11 @@ import { config } from '../config';
 import { alarmsRepo } from '../repositories/alarms.repo';
 import { auditRepo } from '../repositories/audit.repo';
 import { bikesRepo } from '../repositories/bikes.repo';
-import { cardsRepo } from '../repositories/cards.repo';
 import { eventsRepo } from '../repositories/events.repo';
 import { gatesRepo } from '../repositories/gates.repo';
 import { permissionsRepo } from '../repositories/permissions.repo';
 import { tagsRepo } from '../repositories/tags.repo';
+import { usersRepo } from '../repositories/users.repo';
 import { ApiError } from '../errors';
 import { emitRealtime } from '../realtime';
 import { displayRef, hmacIdentifier } from '../security';
@@ -16,7 +16,7 @@ import type { CrossingView, GateEvent, MismatchReason } from '../types';
 
 export interface CrossingInput {
   gateId: string;
-  cardUid?: string | null;
+  studentNumber?: string | null;
   tagUid?: string | null;
   source?: 'automated' | 'manual_entry' | 'guard_override';
   debounce?: boolean;
@@ -40,8 +40,15 @@ export function clearRecentScans(): void {
   recentScans.clear();
 }
 
-function scanKey(gateId: string, cardUid: string | null, tagUid: string | null): string {
-  return [gateId, cardUid ? hmacIdentifier(cardUid) : '-', tagUid ? hmacIdentifier(tagUid) : '-'].join('|');
+const STUDENT_NUMBER_PATTERN = /^\d{8}$/;
+
+function normaliseStudentNumber(raw: string | null | undefined): string | null {
+  const trimmed = raw?.trim() ?? '';
+  return STUDENT_NUMBER_PATTERN.test(trimmed) ? trimmed : null;
+}
+
+function scanKey(gateId: string, studentNumber: string | null, tagUid: string | null): string {
+  return [gateId, studentNumber ?? '-', tagUid ? hmacIdentifier(tagUid) : '-'].join('|');
 }
 
 function pruneRecentScans(now: number): void {
@@ -51,23 +58,23 @@ function pruneRecentScans(now: number): void {
 }
 
 export async function processCrossing(input: CrossingInput): Promise<CrossingOutcome> {
-  const cardUid = input.cardUid?.trim() || null;
+  const studentNumber = normaliseStudentNumber(input.studentNumber);
   const tagUid = input.tagUid?.trim() || null;
   const source = input.source ?? 'automated';
   const debounce = source === 'automated' && input.debounce !== false && config.scanDebounceMs > 0;
 
-  if (!debounce) return evaluateCrossing(input.gateId, cardUid, tagUid, source);
+  if (!debounce) return evaluateCrossing(input.gateId, studentNumber, tagUid, source);
 
   const now = Date.now();
   pruneRecentScans(now);
-  const key = scanKey(input.gateId, cardUid, tagUid);
+  const key = scanKey(input.gateId, studentNumber, tagUid);
   const existing = recentScans.get(key);
   if (existing) {
     const outcome = await existing.promise;
     return { ...outcome, duplicate: true };
   }
 
-  const promise = evaluateCrossing(input.gateId, cardUid, tagUid, source);
+  const promise = evaluateCrossing(input.gateId, studentNumber, tagUid, source);
   recentScans.set(key, { at: now, promise });
   try {
     return await promise;
@@ -79,7 +86,7 @@ export async function processCrossing(input: CrossingInput): Promise<CrossingOut
 
 async function evaluateCrossing(
   gateId: string,
-  cardUid: string | null,
+  studentNumber: string | null,
   tagUid: string | null,
   source: NonNullable<CrossingInput['source']>,
 ): Promise<CrossingOutcome> {
@@ -92,22 +99,18 @@ async function evaluateCrossing(
 
   let userId: string | null = null;
   let bikeId: string | null = null;
-  let cardRefOut: string | null = null;
   let tagRefOut: string | null = null;
   let mismatchReason: MismatchReason | null = null;
 
-  if (!cardUid || !tagUid) {
+  if (!studentNumber || !tagUid) {
     mismatchReason = 'incomplete_read';
-    if (cardUid) cardRefOut = displayRef('CRD', hmacIdentifier(cardUid));
     if (tagUid) tagRefOut = displayRef('BG', hmacIdentifier(tagUid));
   } else {
-    const cardHmac = hmacIdentifier(cardUid);
     const tagHmac = hmacIdentifier(tagUid);
-    cardRefOut = displayRef('CRD', cardHmac);
     tagRefOut = displayRef('BG', tagHmac);
 
-    const [card, tag] = await Promise.all([cardsRepo.findByHmac(cardHmac), tagsRepo.findByHmac(tagHmac)]);
-    userId = card?.userId ?? null;
+    const [person, tag] = await Promise.all([usersRepo.findByStudentNumber(studentNumber), tagsRepo.findByHmac(tagHmac)]);
+    userId = person?.userId ?? null;
 
     if (!tag) {
       mismatchReason = 'tag_not_registered';
@@ -122,10 +125,12 @@ async function evaluateCrossing(
       bikeId = tag.bikeId;
     } else {
       const bike = await bikesRepo.findById(tag.bikeId);
-      const cardActive = !!card && card.status === 'active';
-      const ownsIt = cardActive && !!bike && card.userId === bike.ownerUserId;
+      const accountActive = !!person && person.accountStatus === 'active';
+      const ownsIt = accountActive && !!bike && person.userId === bike.ownerUserId;
       const hasPermission =
-        !ownsIt && cardActive && card && bike ? !!(await permissionsRepo.findActive(bike.bikeId, card.userId)) : false;
+        !ownsIt && accountActive && person && bike
+          ? !!(await permissionsRepo.findActive(bike.bikeId, person.userId))
+          : false;
       bikeId = tag.bikeId;
       if (!bike || !(ownsIt || hasPermission)) mismatchReason = 'tag_registered_to_other_user';
     }
@@ -139,7 +144,7 @@ async function evaluateCrossing(
       gateId: gate.gateId,
       userId,
       bikeId,
-      cardRef: cardRefOut,
+      studentNumber,
       tagRef: tagRefOut,
       result: isMatch ? 'match' : 'mismatch',
       mismatchReason,

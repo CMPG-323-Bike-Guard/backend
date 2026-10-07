@@ -6,8 +6,8 @@ const now = 1_800_000_000_000;
 
 beforeEach(() => resetGateAuthState());
 
-function signed(ts: number, cardUid: string | null = 'C', tagUid: string | null = 'T') {
-  return { cardUid, tagUid, ts, sig: signPayload(gateId, ts, cardUid, tagUid) };
+function signed(ts: number, studentNumber: string | null = 'C', tagUid: string | null = 'T') {
+  return { studentNumber, tagUid, ts, sig: signPayload(gateId, ts, studentNumber, tagUid) };
 }
 
 describe('gate payload signing', () => {
@@ -16,7 +16,7 @@ describe('gate payload signing', () => {
   });
 
   it('rejects unsigned payloads', () => {
-    expect(verifyPayload(gateId, { cardUid: 'C', tagUid: 'T' }, now)).toBe(false);
+    expect(verifyPayload(gateId, { studentNumber: 'C', tagUid: 'T' }, now)).toBe(false);
   });
 
   it('rejects a payload whose contents were changed after signing', () => {

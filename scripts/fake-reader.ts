@@ -5,11 +5,11 @@ import { signPayload } from '../src/gate-auth';
 const [gateId, cardArg, tagArg] = process.argv.slice(2);
 
 if (!gateId) {
-  console.error('Usage: npm run fake-reader -- <gateId> [cardUid|-] [tagUid|-] [--heartbeat] [--unsigned]');
+  console.error('Usage: npm run fake-reader -- <gateId> [studentNumber|-] [tagUid|-] [--heartbeat] [--unsigned]');
   process.exit(1);
 }
 
-const cardUid = !cardArg || cardArg === '-' || cardArg.startsWith('--') ? null : cardArg;
+const studentNumber = !cardArg || cardArg === '-' || cardArg.startsWith('--') ? null : cardArg;
 const tagUid = !tagArg || tagArg === '-' || tagArg.startsWith('--') ? null : tagArg;
 const heartbeat = process.argv.includes('--heartbeat');
 const unsigned = process.argv.includes('--unsigned');
@@ -28,8 +28,8 @@ function nextTs(): number {
 
 function body(card: string | null, tag: string | null) {
   const ts = nextTs();
-  if (unsigned) return { cardUid: card, tagUid: tag };
-  return { cardUid: card, tagUid: tag, ts, sig: signPayload(gateId, ts, card, tag) };
+  if (unsigned) return { studentNumber: card, tagUid: tag };
+  return { studentNumber: card, tagUid: tag, ts, sig: signPayload(gateId, ts, card, tag) };
 }
 
 client.on('connect', () => {
@@ -43,7 +43,7 @@ client.on('connect', () => {
     return;
   }
 
-  client.publish(`${prefix}/${gateId}/scan`, JSON.stringify(body(cardUid, tagUid)));
+  client.publish(`${prefix}/${gateId}/scan`, JSON.stringify(body(studentNumber, tagUid)));
   setTimeout(() => {
     console.log('No decision received within 4s (check the API log for a rejected or malformed message).');
     client.end(false, {}, () => process.exit(1));

@@ -7,7 +7,7 @@ interface EventRow {
   gate_id: string;
   user_id: string | null;
   bike_id: string | null;
-  card_ref: string | null;
+  student_number: string | null;
   tag_ref: string | null;
   result: CrossingResult;
   mismatch_reason: MismatchReason | null;
@@ -25,7 +25,7 @@ function toEvent(row: EventRow): GateEvent {
     gateId: row.gate_id,
     userId: row.user_id,
     bikeId: row.bike_id,
-    cardRef: row.card_ref,
+    studentNumber: row.student_number,
     tagRef: row.tag_ref,
     result: row.result,
     mismatchReason: row.mismatch_reason,
@@ -56,7 +56,7 @@ export const eventsRepo = {
     gateId: string;
     userId: string | null;
     bikeId: string | null;
-    cardRef: string | null;
+    studentNumber: string | null; 
     tagRef: string | null;
     result: CrossingResult;
     mismatchReason: MismatchReason | null;
@@ -68,7 +68,7 @@ export const eventsRepo = {
   }): Promise<GateEvent> {
     const row = await queryOne<EventRow>(
       `INSERT INTO gate_events
-         (gate_id, user_id, bike_id, card_ref, tag_ref, result, mismatch_reason, source, guard_user_id,
+         (gate_id, user_id, bike_id, student_number, tag_ref, result, mismatch_reason, source, guard_user_id,
           verification_ms, offline, note)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
@@ -76,7 +76,7 @@ export const eventsRepo = {
         input.gateId,
         input.userId,
         input.bikeId,
-        input.cardRef,
+        input.studentNumber,
         input.tagRef,
         input.result,
         input.mismatchReason,
@@ -113,7 +113,7 @@ export const eventsRepo = {
     }
     if (filters.query) {
 
-      clauses.push(`(card_ref ILIKE $${i} OR tag_ref ILIKE $${i})`);
+      clauses.push(`(student_number ILIKE $${i} OR tag_ref ILIKE $${i})`);
       params.push(`%${filters.query}%`);
       i += 1;
     }

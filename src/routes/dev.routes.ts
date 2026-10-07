@@ -5,7 +5,7 @@ import { processCrossing } from '../services/verification';
 
 const simulateSchema = z.object({
   gateId: z.string().uuid(),
-  cardUid: z.string().nullable().optional(),
+  studentNumber: z.string().nullable().optional(),
   tagUid: z.string().nullable().optional(),
   debounce: z.boolean().default(false),
 });
@@ -18,7 +18,7 @@ export default async function devRoutes(app: FastifyInstance) {
     const body = simulateSchema.parse(request.body);
     return processCrossing({
       gateId: body.gateId,
-      cardUid: body.cardUid,
+      studentNumber: body.studentNumber,
       tagUid: body.tagUid,
       source: 'automated',
       debounce: body.debounce,

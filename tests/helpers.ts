@@ -24,16 +24,6 @@ export async function makeUser(
   return rows[0].user_id;
 }
 
-export async function makeCard(userId: string, uid: string, status: 'active' | 'blocked' = 'active'): Promise<void> {
-  const hmac = hmacIdentifier(uid);
-  await query('INSERT INTO cards (user_id, card_hmac, card_ref, status) VALUES ($1, $2, $3, $4)', [
-    userId,
-    hmac,
-    displayRef('CRD', hmac),
-    status,
-  ]);
-}
-
 export async function makeGate(mode: 'automated' | 'manual' = 'automated'): Promise<string> {
   const rows = await query<{ gate_id: string }>(
     `INSERT INTO gates (name, location, health, commissioned, mode)

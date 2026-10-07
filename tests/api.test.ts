@@ -4,7 +4,7 @@ import { buildApp } from '../src/app';
 import { signToken } from '../src/auth-plugin';
 import { pool, query } from '../src/db';
 import { usersRepo } from '../src/repositories/users.repo';
-import { makeBike, makeCard, makeGate, makeTag, makeUser, resetDb } from './helpers';
+import { makeBike, makeGate, makeTag, makeUser, resetDb } from './helpers';
 
 let app: FastifyInstance;
 const prefix = '/api/v1';
@@ -134,21 +134,38 @@ describe('POST /auth/login rate limit', () => {
 });
 
 describe('POST /dev/simulate-crossing', () => {
-  it('does not debounce by default, so repeated taps in the emulator each create an event', async () => {
+  const post = (token: string, payload: object) =>
+    app.inject({
+      method: 'POST',
+      url: `${prefix}/dev/simulate-crossing`,
+      headers: { authorization: `Bearer ${token}` },
+      payload,
+    });
+
+  it('matches a student number read from the card against the tag owner', async () => {
     const owner = await makeUser('30000010');
-    await makeCard(owner, 'C1');
     const bike = await makeBike(owner);
     await makeTag(bike, 'T1');
     const gateId = await makeGate();
     const token = await tokenFor(await makeUser('90000002', 'guard'));
-    const send = () =>
-      app.inject({
-        method: 'POST',
-        url: `${prefix}/dev/simulate-crossing`,
-        headers: { authorization: `Bearer ${token}` },
-        payload: { gateId, cardUid: 'C1', tagUid: 'T1' },
-      });
-    const [a, b] = [await send(), await send()];
+
+    const res = await post(token, { gateId, studentNumber: '30000010', tagUid: 'T1' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().gateShouldOpen).toBe(true);
+    expect(res.json().crossing.event.studentNumber).toBe('30000010');
+    expect(res.json().crossing.studentStaffNumber).toBe('30000010');
+  });
+
+  it('does not debounce by default, so repeated taps in the emulator each create an event', async () => {
+    const owner = await makeUser('30000010');
+    const bike = await makeBike(owner);
+    await makeTag(bike, 'T1');
+    const gateId = await makeGate();
+    const token = await tokenFor(await makeUser('90000002', 'guard'));
+    const [a, b] = [
+      await post(token, { gateId, studentNumber: '30000010', tagUid: 'T1' }),
+      await post(token, { gateId, studentNumber: '30000010', tagUid: 'T1' }),
+    ];
     expect(a.json().crossing.event.eventId).not.toBe(b.json().crossing.event.eventId);
   });
 });

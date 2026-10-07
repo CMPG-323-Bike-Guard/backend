@@ -10,7 +10,7 @@ import { startGateWatchdog, recordHeartbeat } from './services/gate-watchdog';
 import { processCrossing } from './services/verification';
 
 const payloadSchema = z.object({
-  cardUid: z.string().nullable().optional(),
+  studentNumber: z.string().nullable().optional(),
   tagUid: z.string().nullable().optional(),
   ts: z.number().optional(),
   sig: z.string().optional(),
@@ -71,7 +71,7 @@ export function startGateBridge(log: FastifyBaseLogger): void {
     try {
       const outcome = await processCrossing({
         gateId,
-        cardUid: payload.cardUid,
+        studentNumber: payload.studentNumber,
         tagUid: payload.tagUid,
         source: 'automated',
       });

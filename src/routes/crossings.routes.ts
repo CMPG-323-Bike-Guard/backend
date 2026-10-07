@@ -41,7 +41,7 @@ export default async function crossingsRoutes(app: FastifyInstance) {
           v.userName?.toLowerCase().includes(needle) ||
           v.studentStaffNumber?.toLowerCase().includes(needle) ||
           v.bikeName?.toLowerCase().includes(needle) ||
-          v.event.cardRef?.toLowerCase().includes(needle) ||
+          v.event.studentNumber?.toLowerCase().includes(needle) ||
           v.event.tagRef?.toLowerCase().includes(needle),
       );
     }
@@ -63,7 +63,7 @@ export default async function crossingsRoutes(app: FastifyInstance) {
       gateId: gate.gateId,
       userId: student.userId,
       bikeId: activeBike?.bikeId ?? null,
-      cardRef: null,
+      studentNumber: student.studentStaffNumber,
       tagRef: null,
       result: 'manual',
       mismatchReason: null,

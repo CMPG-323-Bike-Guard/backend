@@ -50,7 +50,7 @@ gate bridge uses in production:
 ```bash
 curl -X POST localhost:3000/dev/simulate-crossing \
   -H "Authorization: Bearer <guard-or-admin-token>" -H 'Content-Type: application/json' \
-  -d '{"gateId":"<gate-id>","cardUid":"CARD-RAW-0001","tagUid":"TAG-RAW-0001"}'
+  -d '{"gateId":"<gate-id>","studentNumber":"CARD-RAW-0001","tagUid":"TAG-RAW-0001"}'
 ```
 
 Once real hardware exists, point `MQTT_URL` at the broker the Gate Bridge

@@ -28,13 +28,6 @@ export interface User {
   accountStatus: AccountStatus;
 }
 
-export interface Card {
-  cardId: string;
-  userId: string;
-  cardRef: string;
-  status: 'active' | 'blocked';
-}
-
 export interface Bike {
   bikeId: string;
   ownerUserId: string;
@@ -74,7 +67,7 @@ export interface GateEvent {
   gateId: string;
   userId: string | null;
   bikeId: string | null;
-  cardRef: string | null;
+  studentNumber: string | null;
   tagRef: string | null;
   result: CrossingResult;
   mismatchReason: MismatchReason | null;

@@ -87,11 +87,11 @@ export async function buildReports(days: number): Promise<ReportBundle> {
     .filter((event) => event.result === 'mismatch')
     .forEach((event) => {
       const user = event.userId ? usersById.get(event.userId) : null;
-      const key = user?.userId ?? `unidentified:${event.cardRef ?? event.tagRef ?? event.eventId}`;
+      const key = user?.userId ?? `unidentified:${event.studentNumber ?? event.tagRef ?? event.eventId}`;
       const row: RepeatMismatchRow =
         repeats.get(key) ?? {
           userId: user?.userId ?? null,
-          name: user?.name ?? 'Unidentified card',
+          name: user?.name ?? 'Unidentified person',
           studentStaffNumber: user?.studentStaffNumber ?? '—',
           count: 0,
           lastSeen: event.timestamp,
