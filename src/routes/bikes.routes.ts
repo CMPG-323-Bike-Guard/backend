@@ -4,7 +4,6 @@ import { requireOwnerOrRoles } from '../auth-plugin';
 import { ApiError } from '../errors';
 import { auditRepo } from '../repositories/audit.repo';
 import { bikesRepo } from '../repositories/bikes.repo';
-import { cardsRepo } from '../repositories/cards.repo';
 import { notificationsRepo } from '../repositories/notifications.repo';
 import { permissionsRepo } from '../repositories/permissions.repo';
 import { tagsRepo } from '../repositories/tags.repo';
@@ -53,14 +52,6 @@ export default async function bikesRoutes(app: FastifyInstance) {
     const owner = await usersRepo.findById(body.ownerUserId);
     if (!owner) throw ApiError.notFound('No student matches that number.');
 
-    const card = await cardsRepo.findByUserId(body.ownerUserId);
-    if (!card) {
-      throw new ApiError(
-        422,
-        'card_not_validated',
-        'This card could not be validated against the NWU card system. The IT Department needs to resolve it before a bike can be registered.',
-      );
-    }
 
     const bike = await bikesRepo.create({
       ownerUserId: body.ownerUserId,

@@ -1,4 +1,4 @@
-import { pool, query } from '../src/db';
+import { pool, query, withTransaction } from '../src/db';
 import { displayRef, hashPassword, hmacIdentifier } from '../src/security';
 
 
@@ -12,7 +12,6 @@ async function seed() {
   const existing = await query('SELECT 1 FROM users WHERE student_number = $1', ['90003344']);
   if (existing.length > 0) {
     console.log('Dev data is already seeded. Run "npm run seed:reset" to wipe and reseed.');
-    await pool.end();
     return;
   }
   console.log('Seeding BikeGuard dev data...');
@@ -28,21 +27,10 @@ async function seed() {
     return row.user_id;
   }
 
-  async function makeCard(userId: string, rawUid: string) {
-    const hmac = hmacIdentifier(rawUid);
-    await query(`INSERT INTO cards (user_id, card_hmac, card_ref) VALUES ($1,$2,$3)`, [
-      userId,
-      hmac,
-      displayRef('CRD', hmac),
-    ]);
-  }
-
   const thabo = await makeUser('30112233', 'Thabo Mokoena', 'thabo.mokoena@student.nwu.ac.za', 'student');
   const lerato = await makeUser('30112244', 'Lerato Dube', 'lerato.dube@student.nwu.ac.za', 'student');
   const guard = await makeUser('90001122', 'Sipho Nkosi', 'sipho.nkosi@nwu.ac.za', 'guard');
   const admin = await makeUser('90003344', 'Anja van der Merwe', 'anja.vandermerwe@nwu.ac.za', 'admin');
-
-  await Promise.all([makeCard(thabo, 'CARD-RAW-0001'), makeCard(lerato, 'CARD-RAW-0002')]);
 
   const [gate1] = await query<{ gate_id: string }>(
     `INSERT INTO gates (name, location, health, commissioned, mode) VALUES ($1,$2,'good',true,'automated') RETURNING gate_id`,
@@ -78,11 +66,11 @@ async function seed() {
   void gate1;
   void admin;
   void guard;
-
-  await pool.end();
 }
 
-seed().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+withTransaction(seed)
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(() => pool.end());
