@@ -58,7 +58,7 @@ function migrate() {
                 case 3:
                     probe = (_a.sent()).rows;
                     if (!probe[0].present) return [3 /*break*/, 5];
-                    console.log('Existing schema detected — recording 001_init.sql as already applied.');
+                    console.log('Existing schema detected , recording 001_init.sql as already applied.');
                     return [4 /*yield*/, db_1.pool.query('INSERT INTO schema_migrations (filename) VALUES ($1)', ['001_init.sql'])];
                 case 4:
                     _a.sent();

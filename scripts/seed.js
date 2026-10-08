@@ -86,11 +86,11 @@ function seed() {
                     return [4 /*yield*/, makeUser('90003344', 'Anja van der Merwe', 'anja.vandermerwe@nwu.ac.za', 'admin')];
                 case 8:
                     admin = _a.sent();
-                    return [4 /*yield*/, (0, db_1.query)("INSERT INTO gates (name, location, health, commissioned, mode) VALUES ($1,$2,'good',true,'automated') RETURNING gate_id", ['Gate 1 — Building G16', 'Building G16, east entrance'])];
+                    return [4 /*yield*/, (0, db_1.query)("INSERT INTO gates (name, location, health, commissioned, mode) VALUES ($1,$2,'good',true,'automated') RETURNING gate_id", ['Gate 1 , Building G16', 'Building G16, east entrance'])];
                 case 9:
                     gate1 = (_a.sent())[0];
                     return [4 /*yield*/, (0, db_1.query)("INSERT INTO gates (name, location, health, commissioned, mode) VALUES ($1,$2,'good',true,'automated')", [
-                            'Gate 2 — Res Village',
+                            'Gate 2 , Res Village',
                             'Res Village main boom',
                         ])];
                 case 10:

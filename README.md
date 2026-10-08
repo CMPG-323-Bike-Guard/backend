@@ -2,22 +2,22 @@
 
 REST API, real-time gateway and gate verification engine for BikeGuard, the
 RFID bicycle security and gate verification platform for the NWU campus.
-This repository is independent of `CMPG-323-Bike-Guard/frontend` — it has no
-build-time or runtime dependency on it — but its API surface is written to
+This repository is independent of `CMPG-323-Bike-Guard/frontend` , it has no
+build-time or runtime dependency on it , but its API surface is written to
 match that frontend's contract exactly (`src/api/endpoints.ts`,
 `src/types/index.ts`, `src/api/realtime.ts`) so it's a drop-in replacement
 for the frontend's mock server.
 
 ## Stack
 
-- **Fastify** (TypeScript) — HTTP API
-- **PostgreSQL** via `pg` — no ORM; hand-written parameterised SQL in
+- **Fastify** (TypeScript) , HTTP API
+- **PostgreSQL** via `pg` , no ORM; hand-written parameterised SQL in
   `src/repositories/*`, kept intentionally close to the reviewed
   `bikeguard_schema.sql` / `.drawio` model. (Swapping in Prisma or Drizzle
   later is possible without touching `migrations/001_init.sql`.)
-- **Socket.io** — pushes `gate-event` messages to the guard dashboard
-- **JWT** (`jsonwebtoken`) — stateless sessions, role-based access control
-- **MQTT** (optional) — the production integration point for the physical
+- **Socket.io** , pushes `gate-event` messages to the guard dashboard
+- **JWT** (`jsonwebtoken`) , stateless sessions, role-based access control
+- **MQTT** (optional) , the production integration point for the physical
   Gate Bridge; the API runs fine with it disconnected
 
 ## Getting started
@@ -54,7 +54,7 @@ curl -X POST localhost:3000/dev/simulate-crossing \
 ```
 
 Once real hardware exists, point `MQTT_URL` at the broker the Gate Bridge
-publishes to — no application code changes needed (see `src/mqtt.ts`).
+publishes to , no application code changes needed (see `src/mqtt.ts`).
 
 ## Project layout
 
@@ -93,12 +93,12 @@ scripts/
   listener's call into the verification engine throws (e.g. the database is
   briefly unreachable), the gate is switched to manual mode automatically
   rather than left in an undefined state.
-- **Audit trail (NFR-AUD-01):** every state-changing action — registrations,
+- **Audit trail (NFR-AUD-01):** every state-changing action , registrations,
   approvals, tag lifecycle, permissions, crossings, alarm resolutions, gate
-  mode changes — is written to `audit_log` via `src/repositories/audit.repo.ts`
+  mode changes , is written to `audit_log` via `src/repositories/audit.repo.ts`
   and exposed to admins at `GET /audit`.
 - **Schema deviations from the reviewed `bikeguard_schema.sql`:** documented
-  inline in `migrations/001_init.sql` with `CHANGED:` comments — mainly the
+  inline in `migrations/001_init.sql` with `CHANGED:` comments , mainly the
   richer `bike_status` lifecycle, split `gate_health`/`gate_mode`, the
   frontend-facing `mismatch_reason` enum, and the added `notifications` and
   `audit_log` tables, all needed to serve the frontend's existing API

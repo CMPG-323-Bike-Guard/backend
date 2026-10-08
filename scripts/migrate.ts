@@ -19,7 +19,7 @@ async function migrate() {
   if (applied.size === 0 && files.includes('001_init.sql')) {
     const { rows: probe } = await pool.query<{ present: string | null }>(`SELECT to_regclass('public.users') AS present`);
     if (probe[0].present) {
-      console.log('Existing schema detected — recording 001_init.sql as already applied.');
+      console.log('Existing schema detected , recording 001_init.sql as already applied.');
       await pool.query('INSERT INTO schema_migrations (filename) VALUES ($1)', ['001_init.sql']);
       applied.add('001_init.sql');
     }

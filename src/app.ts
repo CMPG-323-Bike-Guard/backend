@@ -24,6 +24,19 @@ export async function buildApp(): Promise<FastifyInstance> {
     trustProxy: config.trustProxy,
   });
 
+
+    // Browsers and tools sometimes send `Content-Type: application/json` with no body (e.g. POST /bikes/:id/submit).
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_request, body, done) => {
+    if (!body || (body as string).trim() === '') return done(null, undefined);
+    try {
+      done(null, JSON.parse(body as string));
+    } catch {
+      const err = new Error('Body is not valid JSON.') as Error & { statusCode: number };
+      err.statusCode = 400;
+      done(err, undefined);
+    }
+  });
+
   await app.register(cors, { origin: config.corsOrigin, credentials: true });
   await app.register(fastifyStatic, {
     root: path.join(process.cwd(), config.uploadsDir),

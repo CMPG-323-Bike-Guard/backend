@@ -92,7 +92,7 @@ export async function buildReports(days: number): Promise<ReportBundle> {
         repeats.get(key) ?? {
           userId: user?.userId ?? null,
           name: user?.name ?? 'Unidentified person',
-          studentStaffNumber: user?.studentStaffNumber ?? '—',
+          studentStaffNumber: user?.studentStaffNumber ?? ',',
           count: 0,
           lastSeen: event.timestamp,
           reasons: [],

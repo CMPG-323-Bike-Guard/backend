@@ -34,10 +34,10 @@ async function seed() {
 
   const [gate1] = await query<{ gate_id: string }>(
     `INSERT INTO gates (name, location, health, commissioned, mode) VALUES ($1,$2,'good',true,'automated') RETURNING gate_id`,
-    ['Gate 1 — Building G16', 'Building G16, east entrance'],
+    ['Gate 1 , Building G16', 'Building G16, east entrance'],
   );
   await query(`INSERT INTO gates (name, location, health, commissioned, mode) VALUES ($1,$2,'good',true,'automated')`, [
-    'Gate 2 — Res Village',
+    'Gate 2 , Res Village',
     'Res Village main boom',
   ]);
 

@@ -80,7 +80,7 @@ function toPermissionViews(bikeId) {
                                     case 0: return [4 /*yield*/, users_repo_1.usersRepo.findById(permission.authorisedUserId)];
                                     case 1:
                                         user = _c.sent();
-                                        return [2 /*return*/, __assign(__assign({}, permission), { authorisedUserName: (_a = user === null || user === void 0 ? void 0 : user.name) !== null && _a !== void 0 ? _a : 'Unknown student', authorisedStudentNumber: (_b = user === null || user === void 0 ? void 0 : user.studentStaffNumber) !== null && _b !== void 0 ? _b : '—' })];
+                                        return [2 /*return*/, __assign(__assign({}, permission), { authorisedUserName: (_a = user === null || user === void 0 ? void 0 : user.name) !== null && _a !== void 0 ? _a : 'Unknown student', authorisedStudentNumber: (_b = user === null || user === void 0 ? void 0 : user.studentStaffNumber) !== null && _b !== void 0 ? _b : ',' })];
                                 }
                             });
                         }); }))];

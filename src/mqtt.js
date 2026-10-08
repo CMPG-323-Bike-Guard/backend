@@ -56,7 +56,7 @@ var uuidSchema = zod_1.z.string().uuid();
 function startGateBridge(log) {
     var _this = this;
     if (!config_1.config.mqttUrl) {
-        log.info('MQTT_URL not set — gate bridge disabled (REST /dev/simulate-crossing still works).');
+        log.info('MQTT_URL not set , gate bridge disabled (REST /dev/simulate-crossing still works).');
         return;
     }
     var client = mqtt_1.default.connect(config_1.config.mqttUrl, {
@@ -119,7 +119,7 @@ function startGateBridge(log) {
                         log.warn({ gateId: gateId, code: err_1.code }, 'Gate bridge could not verify a scan.');
                         return [2 /*return*/];
                     }
-                    log.error({ err: err_1, gateId: gateId }, 'Gate bridge failed to process a scan — falling back the lane to manual mode.');
+                    log.error({ err: err_1, gateId: gateId }, 'Gate bridge failed to process a scan , falling back the lane to manual mode.');
                     return [4 /*yield*/, gates_repo_1.gatesRepo.setMode(gateId, 'manual', 'error', new Date()).catch(function () { return null; })];
                 case 4:
                     failed = _a.sent();

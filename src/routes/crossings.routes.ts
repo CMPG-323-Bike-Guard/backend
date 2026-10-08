@@ -71,7 +71,7 @@ export default async function crossingsRoutes(app: FastifyInstance) {
       guardUserId: actor.userId,
       verificationMs: null,
       offline: gate.mode === 'manual',
-      note: `${body.bikeDescription.trim()}${body.note.trim() ? ` — ${body.note.trim()}` : ''}`,
+      note: `${body.bikeDescription.trim()}${body.note.trim() ? ` , ${body.note.trim()}` : ''}`,
     });
 
     await auditRepo.record({

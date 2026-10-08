@@ -20,7 +20,7 @@ const uuidSchema = z.string().uuid();
 
 export function startGateBridge(log: FastifyBaseLogger): void {
   if (!config.mqttUrl) {
-    log.info('MQTT_URL not set — gate bridge disabled (REST /dev/simulate-crossing still works).');
+    log.info('MQTT_URL not set , gate bridge disabled (REST /dev/simulate-crossing still works).');
     return;
   }
 
@@ -87,7 +87,7 @@ export function startGateBridge(log: FastifyBaseLogger): void {
         return;
       }
 
-      log.error({ err, gateId }, 'Gate bridge failed to process a scan — falling back the lane to manual mode.');
+      log.error({ err, gateId }, 'Gate bridge failed to process a scan , falling back the lane to manual mode.');
       const failed = await gatesRepo.setMode(gateId, 'manual', 'error', new Date()).catch(() => null);
       if (failed) emitRealtime({ type: 'gate', gate: failed });
     }

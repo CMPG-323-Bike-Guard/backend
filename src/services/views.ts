@@ -28,7 +28,7 @@ async function toPermissionViews(bikeId: string): Promise<PermissionView[]> {
       return {
         ...permission,
         authorisedUserName: user?.name ?? 'Unknown student',
-        authorisedStudentNumber: user?.studentStaffNumber ?? '—',
+        authorisedStudentNumber: user?.studentStaffNumber ?? ',',
       };
     }),
   );

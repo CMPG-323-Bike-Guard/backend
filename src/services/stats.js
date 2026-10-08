@@ -166,7 +166,7 @@ function buildReports(days) {
                         var row = (_d = repeats.get(key)) !== null && _d !== void 0 ? _d : {
                             userId: (_e = user === null || user === void 0 ? void 0 : user.userId) !== null && _e !== void 0 ? _e : null,
                             name: (_f = user === null || user === void 0 ? void 0 : user.name) !== null && _f !== void 0 ? _f : 'Unidentified person',
-                            studentStaffNumber: (_g = user === null || user === void 0 ? void 0 : user.studentStaffNumber) !== null && _g !== void 0 ? _g : '—',
+                            studentStaffNumber: (_g = user === null || user === void 0 ? void 0 : user.studentStaffNumber) !== null && _g !== void 0 ? _g : ',',
                             count: 0,
                             lastSeen: event.timestamp,
                             reasons: [],
