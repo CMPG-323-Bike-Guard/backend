@@ -92,7 +92,9 @@ export interface Alarm {
 export interface BikePermission {
   permissionId: string;
   bikeId: string;
-  authorisedUserId: string;
+  authorisedUserId: string | null;
+  authorisedStudentNumber: string;
+  authorisedName: string | null;
   status: 'active' | 'revoked';
   grantedAt: string;
   revokedAt: string | null;
@@ -146,7 +148,6 @@ export interface CrossingView {
 
 export interface PermissionView extends BikePermission {
   authorisedUserName: string;
-  authorisedStudentNumber: string;
 }
 
 export interface BikeView {

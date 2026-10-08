@@ -28,7 +28,10 @@ const updateBikeSchema = z.object({
 });
 
 const reportLostSchema = z.object({ stolen: z.boolean().default(false) });
-const grantPermissionSchema = z.object({ studentNumber: z.string().min(1) });
+const grantPermissionSchema = z.object({
+  studentNumber: z.string().trim().regex(/^\d{8}$/, 'A student or staff number is 8 digits.'),
+  name: z.string().trim().max(80).optional(),
+});
 
 async function requireBikeAccess(request: Parameters<typeof requireOwnerOrRoles>[0], bikeId: string) {
   const bike = await bikesRepo.findById(bikeId);
@@ -174,31 +177,44 @@ export default async function bikesRoutes(app: FastifyInstance) {
     const bike = await requireBikeAccess(request, request.params.bikeId);
     const body = grantPermissionSchema.parse(request.body);
 
+        // The guest does not need a BikeGuard account: the gate identifies them by the number on their card.
     const target = await usersRepo.findByStudentNumber(body.studentNumber);
-    if (!target || target.role !== 'student') {
-      throw ApiError.badRequest('No student matches that number.', 'studentNumber');
+    if (target && target.role !== 'student') {
+      throw ApiError.badRequest('That number belongs to a staff account, not a student card.', 'studentNumber');
     }
-    if (target.userId === bike.ownerUserId) {
+    if (target && target.accountStatus !== 'active') {
+      throw ApiError.badRequest('That account is suspended.', 'studentNumber');
+    }
+    const owner = await usersRepo.findById(bike.ownerUserId);
+    if (body.studentNumber === owner?.studentStaffNumber) {
       throw ApiError.badRequest('You already own this bike.', 'studentNumber');
     }
-    const existing = await permissionsRepo.findActive(bike.bikeId, target.userId);
-    if (existing) throw ApiError.conflict(`${target.name} can already use this bike.`, 'studentNumber');
+    const label = target?.name ?? (body.name || `Student ${body.studentNumber}`);
+    const existing = await permissionsRepo.findActive(bike.bikeId, body.studentNumber);
+    if (existing) throw ApiError.conflict(`${label} can already use this bike.`, 'studentNumber');
 
-    await permissionsRepo.create({ bikeId: bike.bikeId, authorisedUserId: target.userId, grantedBy: actor.userId });
+    await permissionsRepo.create({
+      bikeId: bike.bikeId,
+      studentNumber: body.studentNumber,
+      authorisedUserId: target?.userId ?? null,
+      name: body.name || null,
+      grantedBy: actor.userId,
+    });
     await auditRepo.record({
       actorUserId: actor.userId,
       action: 'permission.granted',
       entityType: 'bike_permission',
       entityId: bike.bikeId,
-      detail: `${target.name} authorised to use ${bike.name}.`,
+      detail: `${label} (${body.studentNumber}) authorised to use ${bike.name}.`,
     });
-    await notificationsRepo.create({
-      userId: target.userId,
-      title: `You can use ${bike.name}`,
-      body: `${(await usersRepo.findById(bike.ownerUserId))?.name ?? 'The owner'} authorised you to take this bike through the gate.`,
-      kind: 'registration',
-    });
-    return toBikeView(bike);
+    if (target) {
+      await notificationsRepo.create({
+        userId: target.userId,
+        title: `You can use ${bike.name}`,
+        body: `${owner?.name ?? 'The owner'} authorised you to take this bike through the gate.`,
+        kind: 'registration',
+      });
+    }
   });
 
   app.delete<{ Params: { permissionId: string } }>('/permissions/:permissionId', async (request) => {

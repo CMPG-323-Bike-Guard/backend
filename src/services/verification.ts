@@ -127,11 +127,13 @@ async function evaluateCrossing(
       const bike = await bikesRepo.findById(tag.bikeId);
       const accountActive = !!person && person.accountStatus === 'active';
       const ownsIt = accountActive && !!bike && person.userId === bike.ownerUserId;
-      const hasPermission =
-        !ownsIt && accountActive && person && bike
-          ? !!(await permissionsRepo.findActive(bike.bikeId, person.userId))
-          : false;
-      bikeId = tag.bikeId;
+              // A guest only needs the student number on their card; a BikeGuard account is optional,
+        // but if they do have one it must not be suspended.
+        const guestAllowed = !person || person.accountStatus === 'active';
+        const hasPermission =
+          !ownsIt && guestAllowed && bike && studentNumber
+            ? !!(await permissionsRepo.findActive(bike.bikeId, studentNumber))
+            : false;
       if (!bike || !(ownsIt || hasPermission)) mismatchReason = 'tag_registered_to_other_user';
     }
   }

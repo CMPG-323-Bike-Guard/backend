@@ -24,11 +24,12 @@ async function toPermissionViews(bikeId: string): Promise<PermissionView[]> {
   const permissions = await permissionsRepo.listForBike(bikeId);
   return Promise.all(
     permissions.map(async (permission) => {
-      const user = await usersRepo.findById(permission.authorisedUserId);
+            const user = permission.authorisedUserId
+        ? await usersRepo.findById(permission.authorisedUserId)
+        : await usersRepo.findByStudentNumber(permission.authorisedStudentNumber);
       return {
         ...permission,
-        authorisedUserName: user?.name ?? 'Unknown student',
-        authorisedStudentNumber: user?.studentStaffNumber ?? ',',
+        authorisedUserName: user?.name ?? permission.authorisedName ?? `Student ${permission.authorisedStudentNumber}`,
       };
     }),
   );

@@ -4,7 +4,9 @@ import type { BikePermission } from '../types';
 interface PermissionRow {
   permission_id: string;
   bike_id: string;
-  authorised_user_id: string;
+  authorised_user_id: string | null;
+  authorised_student_number: string;
+  authorised_name: string | null;
   status: 'active' | 'revoked';
   granted_at: string;
   revoked_at: string | null;
@@ -15,13 +17,16 @@ function toPermission(row: PermissionRow): BikePermission {
     permissionId: row.permission_id,
     bikeId: row.bike_id,
     authorisedUserId: row.authorised_user_id,
+    authorisedStudentNumber: row.authorised_student_number,
+    authorisedName: row.authorised_name,
     status: row.status,
     grantedAt: new Date(row.granted_at).toISOString(),
     revokedAt: row.revoked_at ? new Date(row.revoked_at).toISOString() : null,
   };
 }
 
-const COLUMNS = 'permission_id, bike_id, authorised_user_id, status, granted_at, revoked_at';
+const COLUMNS =
+  'permission_id, bike_id, authorised_user_id, authorised_student_number, authorised_name, status, granted_at, revoked_at';
 
 export const permissionsRepo = {
   async findById(permissionId: string): Promise<BikePermission | null> {
@@ -40,20 +45,28 @@ export const permissionsRepo = {
     return rows.map(toPermission);
   },
 
-  async findActive(bikeId: string, authorisedUserId: string): Promise<BikePermission | null> {
+  /** Looks a guest up by the student number read from their card. No account is needed. */
+  async findActive(bikeId: string, studentNumber: string): Promise<BikePermission | null> {
     const row = await queryOne<PermissionRow>(
       `SELECT ${COLUMNS} FROM bike_permissions
-       WHERE bike_id = $1 AND authorised_user_id = $2 AND status = 'active'`,
-      [bikeId, authorisedUserId],
+       WHERE bike_id = $1 AND authorised_student_number = $2 AND status = 'active'`,
+      [bikeId, studentNumber],
     );
     return row ? toPermission(row) : null;
   },
 
-  async create(input: { bikeId: string; authorisedUserId: string; grantedBy: string }): Promise<BikePermission> {
+  async create(input: {
+    bikeId: string;
+    grantedBy: string;
+    studentNumber?: string;
+    authorisedUserId?: string | null;
+    name?: string | null;
+  }): Promise<BikePermission> {
     const row = await queryOne<PermissionRow>(
-      `INSERT INTO bike_permissions (bike_id, authorised_user_id, granted_by)
-       VALUES ($1, $2, $3) RETURNING ${COLUMNS}`,
-      [input.bikeId, input.authorisedUserId, input.grantedBy],
+      `INSERT INTO bike_permissions (bike_id, authorised_user_id, authorised_student_number, authorised_name, granted_by)
+       VALUES ($1, $2, COALESCE($3, (SELECT student_number FROM users WHERE user_id = $2)), $4, $5)
+       RETURNING ${COLUMNS}`,
+      [input.bikeId, input.authorisedUserId ?? null, input.studentNumber ?? null, input.name ?? null, input.grantedBy],
     );
     return toPermission(row!);
   },
