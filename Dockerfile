@@ -11,6 +11,9 @@ ENV NODE_ENV=production
 COPY package*.json ./
 RUN npm install --omit=dev
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/src ./src
+COPY --from=build /app/scripts ./scripts
+COPY --from=build /app/tsconfig.json ./
 COPY migrations ./migrations
 EXPOSE 3000
 CMD ["node", "dist/server.js"]
