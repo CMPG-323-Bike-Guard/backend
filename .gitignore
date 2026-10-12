@@ -6,3 +6,7 @@ uploads/
 .DS_Store
 src/**/*.js
 secrets.txt
+src/**/*.js
+tests/**/*.js
+scripts/**/*.js
+vitest.config.js
