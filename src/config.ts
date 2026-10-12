@@ -29,6 +29,7 @@ export const config = {
 
   uploadsDir: process.env.UPLOADS_DIR ?? 'uploads',
   publicUploadsPath: process.env.PUBLIC_UPLOADS_PATH ?? '/uploads',
+  photoStorage: process.env.PHOTO_STORAGE === 'db' ? 'db' : 'disk',
 
   mqttUrl: process.env.MQTT_URL,
   mqttUsername: process.env.MQTT_USERNAME,

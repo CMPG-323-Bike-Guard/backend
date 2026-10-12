@@ -5,6 +5,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import path from 'node:path';
 import { authPlugin } from './auth-plugin';
 import { config } from './config';
+import { query } from './db';
 import { registerErrorHandler } from './errors';
 
 import authRoutes from './routes/auth.routes';
@@ -22,6 +23,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: config.isProduction ? true : { transport: { target: 'pino-pretty' } },
     trustProxy: config.trustProxy,
+    bodyLimit: 12 * 1024 * 1024,
   });
 
 
@@ -38,10 +40,28 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await app.register(cors, { origin: config.corsOrigin, credentials: true });
-  await app.register(fastifyStatic, {
-    root: path.join(process.cwd(), config.uploadsDir),
-    prefix: `${config.publicUploadsPath}/`,
-  });
+    if (config.photoStorage === 'db') {
+    app.get<{ Params: { subdir: string; filename: string } }>(
+      `${config.publicUploadsPath}/:subdir/:filename`,
+      async (request, reply) => {
+        const { subdir, filename } = request.params;
+        const rows = await query<{ mime_type: string; data: Buffer }>(
+          'SELECT mime_type, data FROM photo_files WHERE file_path = $1',
+          [`${subdir}/${filename}`],
+        );
+        if (rows.length === 0) return reply.code(404).send({ code: 'not_found', message: 'Photo not found.' });
+        return reply
+          .header('Content-Type', rows[0].mime_type)
+          .header('Cache-Control', 'public, max-age=31536000, immutable')
+          .send(rows[0].data);
+      },
+    );
+  } else {
+    await app.register(fastifyStatic, {
+      root: path.join(process.cwd(), config.uploadsDir),
+      prefix: `${config.publicUploadsPath}/`,
+    });
+  }
   await app.register(rateLimit, { global: false, hook: 'preHandler' });
   await app.register(authPlugin);
   registerErrorHandler(app);
