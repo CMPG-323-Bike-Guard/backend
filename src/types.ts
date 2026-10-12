@@ -16,7 +16,33 @@ export type MismatchReason =
   | 'incomplete_read';
 export type AlarmStatus = 'open' | 'escalated' | 'cleared_in_person' | 'reported_stolen';
 export type CrossingSource = 'automated' | 'manual_entry' | 'guard_override';
-export type NotificationKind = 'tag_ready' | 'registration' | 'security' | 'system';
+export type NotificationKind = 'tag_ready' | 'registration' | 'security' | 'photo_review' | 'system';
+export type PhotoStatus = 'none' | 'pending' | 'approved' | 'rejected';
+export type PhotoTargetType = 'user' | 'bike';
+
+export interface PhotoModeration {
+  live: string | null;
+  pending: string | null;
+  status: PhotoStatus;
+  rejectionReason: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  submittedAt: string | null;
+}
+
+export interface PendingPhoto {
+  targetType: PhotoTargetType;
+  entityId: string;
+  ownerUserId: string;
+  ownerName: string;
+  photo: PhotoModeration;
+}
+
+export interface PhotoReviewResult {
+  targetType: PhotoTargetType;
+  entityId: string;
+  photo: PhotoModeration;
+}
 
 export interface User {
   userId: string;
@@ -24,6 +50,8 @@ export interface User {
   name: string;
   role: Role;
   email: string;
+  phone: string | null;
+  photo: PhotoModeration;
   photoPath: string | null;
   accountStatus: AccountStatus;
 }
@@ -34,6 +62,7 @@ export interface Bike {
   name: string;
   makeModel: string;
   colour: string;
+  photo: PhotoModeration;
   photoPath: string | null;
   status: BikeStatus;
   submittedAt: string;

@@ -1,7 +1,8 @@
 import { query, queryOne } from '../db';
+import { toPhoto, type PhotoColumns } from '../photos';
 import type { AccountStatus, Role, User } from '../types';
 
-interface UserRow {
+interface UserRow extends PhotoColumns {
   user_id: string;
   student_number: string;
   name: string;
@@ -9,7 +10,7 @@ interface UserRow {
   role: Role;
   account_status: AccountStatus;
   password_hash: string;
-  photo_path: string | null;
+  phone: string | null;
 }
 
 export interface UserWithPassword extends User {
@@ -23,6 +24,8 @@ function toUser(row: UserRow): User {
     name: row.name,
     role: row.role,
     email: row.email,
+    phone: row.phone,
+    photo: toPhoto(row),
     photoPath: row.photo_path,
     accountStatus: row.account_status,
   };
@@ -74,5 +77,17 @@ export const usersRepo = {
       [input.studentNumber, input.name, input.email, input.role, input.passwordHash, input.photoPath ?? null],
     );
     return toUser(row!);
+  },
+
+  async updateDetails(userId: string, fields: { name: string; email: string; phone: string | null }): Promise<User | null> {
+    const row = await queryOne<UserRow>(
+      'UPDATE users SET name = $2, email = $3, phone = $4 WHERE user_id = $1 RETURNING *',
+      [userId, fields.name, fields.email, fields.phone],
+    );
+    return row ? toUser(row) : null;
+  },
+
+  async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
+    await query('UPDATE users SET password_hash = $2 WHERE user_id = $1', [userId, passwordHash]);
   },
 };

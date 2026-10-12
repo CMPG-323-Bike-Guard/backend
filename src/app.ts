@@ -10,7 +10,7 @@ import { registerErrorHandler } from './errors';
 
 import authRoutes from './routes/auth.routes';
 import usersRoutes from './routes/users.routes';
-import bikesRoutes from './routes/bikes.routes';
+import photosRoutes from './routes/photos.routes';
 import registrationsRoutes from './routes/registrations.routes';
 import tagsRoutes from './routes/tags.routes';
 import gatesRoutes from './routes/gates.routes';
@@ -23,7 +23,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: config.isProduction ? true : { transport: { target: 'pino-pretty' } },
     trustProxy: config.trustProxy,
-    bodyLimit: 12 * 1024 * 1024,
+    bodyLimit: 8 * 1024 * 1024,
   });
 
 
@@ -72,7 +72,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     async (api) => {
       await api.register(authRoutes);
       await api.register(usersRoutes);
-      await api.register(bikesRoutes);
+      await api.register(photosRoutes)
       await api.register(registrationsRoutes);
       await api.register(tagsRoutes);
       await api.register(gatesRoutes);

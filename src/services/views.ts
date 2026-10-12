@@ -6,6 +6,7 @@ import { permissionsRepo } from '../repositories/permissions.repo';
 import { tagsRepo } from '../repositories/tags.repo';
 import { usersRepo } from '../repositories/users.repo';
 import { query } from '../db';
+import { withoutPending } from '../photos';
 import { ApiError } from '../errors';
 import type {
   Alarm,
@@ -119,10 +120,10 @@ export async function buildAlarmView(alarm: Alarm): Promise<AlarmView> {
     alarm,
     event,
     gateName: gate?.name ?? 'Unknown gate',
-    presentedUser,
-    registeredOwner,
-    tagBike,
-    ownerBikes,
+    presentedUser: withoutPending(presentedUser),
+    registeredOwner: withoutPending(registeredOwner),
+    tagBike: withoutPending(tagBike),
+    ownerBikes: ownerBikes.map((bike) => withoutPending(bike)),
     resolvedByName,
   };
 }

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { requireOwnerOrRoles } from '../auth-plugin';
 import { ApiError } from '../errors';
@@ -8,7 +8,11 @@ import { usersRepo } from '../repositories/users.repo';
 import { toBikeViews } from '../services/views';
 import { withTransaction } from '../db';
 import { auditRepo } from '../repositories/audit.repo';
-import { hashPassword } from '../security';
+import { hashPassword, verifyPassword } from '../security';
+import { config } from '../config';
+import { withoutPending } from '../photos';
+import { photosRepo } from '../repositories/photos.repo';
+import { savePhotoDataUrl } from '../uploads';
 
 const createUserSchema = z.object({
   studentStaffNumber: z.string().trim().regex(/^\d{8}$/, 'A student or staff number is 8 digits.'),
@@ -18,11 +22,32 @@ const createUserSchema = z.object({
   password: z.string().min(8, 'Passwords are at least 8 characters.'),
 });
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\+?[\d\s().-]{7,30}$/;
+
+function parseOwnDetails(body: unknown) {
+  const input = (body ?? {}) as { name?: unknown; email?: unknown; phone?: unknown };
+  const name = typeof input.name === 'string' ? input.name.trim() : '';
+  const email = typeof input.email === 'string' ? input.email.trim().toLowerCase() : '';
+  const phone = typeof input.phone === 'string' ? input.phone.trim() : '';
+
+  if (name.length < 2 || name.length > 80) {
+    throw new ApiError(400, 'invalid_name', 'Name must be between 2 and 80 characters.', 'name');
+  }
+  if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
+    throw new ApiError(400, 'invalid_email', 'Enter a valid email address.', 'email');
+  }
+  if (phone.length > 30 || (phone && !PHONE_PATTERN.test(phone))) {
+    throw new ApiError(400, 'invalid_phone', 'Enter a valid phone number.', 'phone');
+  }
+  return { name, email, phone: phone || null };
+}
+
 export default async function usersRoutes(app: FastifyInstance) {
 
   app.get<{ Querystring: { role?: 'student' | 'guard' | 'admin' } }>('/users', async (request) => {
     request.requireRole('admin', 'guard');
-    return usersRepo.list(request.query.role);
+    return (await usersRepo.list(request.query.role)).map((user) => withoutPending(user));
   });
 
     app.post('/users', async (request, reply) => {
@@ -49,7 +74,7 @@ export default async function usersRoutes(app: FastifyInstance) {
         return created;
       });
       reply.status(201);
-      return user;
+      return withoutPending(user);
     } catch (err) {
       const pgError = err as { code?: string; constraint?: string };
       if (pgError.code === '23505') {
@@ -60,6 +85,82 @@ export default async function usersRoutes(app: FastifyInstance) {
       }
       throw err;
     }
+  });
+
+    app.patch('/users/me', async (request) => {
+    const actor = request.requireAuth();
+    const details = parseOwnDetails(request.body);
+    try {
+      const updated = await usersRepo.updateDetails(actor.userId, details);
+      if (!updated) throw ApiError.unauthenticated();
+      await auditRepo.record({
+        actorUserId: actor.userId,
+        action: 'profile.updated',
+        entityType: 'user',
+        entityId: actor.userId,
+        detail: 'Name, email, and phone updated.',
+      });
+      return updated;
+    } catch (err) {
+      const pgError = err as { code?: string; constraint?: string };
+      if (pgError.code === '23505' && pgError.constraint === 'users_email_key') {
+        throw ApiError.conflict('That email address is already in use.', 'email');
+      }
+      throw err;
+    }
+  });
+
+  app.post('/users/me/password', {
+    config: {
+      rateLimit: {
+        max: config.loginRateLimitMax,
+        timeWindow: config.loginRateLimitWindow,
+        keyGenerator: (request: FastifyRequest) => `pw:${request.authUser?.userId ?? request.ip}`,
+      },
+    },
+  }, async (request) => {
+    const actor = request.requireAuth();
+    const input = (request.body ?? {}) as { currentPassword?: unknown; newPassword?: unknown };
+    const currentPassword = typeof input.currentPassword === 'string' ? input.currentPassword : '';
+    const newPassword = typeof input.newPassword === 'string' ? input.newPassword : '';
+
+    if (!currentPassword) {
+      throw new ApiError(400, 'current_password_required', 'Enter your current password.', 'currentPassword');
+    }
+    if (newPassword.length < 8) {
+      throw new ApiError(400, 'invalid_password', 'Passwords must be at least 8 characters.', 'newPassword');
+    }
+    const user = await usersRepo.findByIdWithPassword(actor.userId);
+    if (!user) throw ApiError.unauthenticated();
+    if (!(await verifyPassword(currentPassword, user.passwordHash))) {
+      throw new ApiError(400, 'invalid_current_password', 'That is not your current password.', 'currentPassword');
+    }
+    await usersRepo.setPasswordHash(user.userId, await hashPassword(newPassword));
+    await auditRepo.record({
+      actorUserId: actor.userId,
+      action: 'profile.password_changed',
+      entityType: 'user',
+      entityId: actor.userId,
+      detail: 'Password changed.',
+    });
+    return { success: true };
+  });
+
+  app.post('/users/me/photo', async (request) => {
+    const actor = request.requireAuth();
+    const input = (request.body ?? {}) as { photoDataUrl?: unknown };
+    const pendingPhotoUrl = await savePhotoDataUrl(input.photoDataUrl, 'users', actor.userId);
+    await photosRepo.submit('user', actor.userId, pendingPhotoUrl);
+    await auditRepo.record({
+      actorUserId: actor.userId,
+      action: 'profile.photo_submitted',
+      entityType: 'user',
+      entityId: actor.userId,
+      detail: 'Profile photo submitted for review.',
+    });
+    const user = await usersRepo.findById(actor.userId);
+    if (!user) throw ApiError.unauthenticated();
+    return user;
   });
 
   app.get<{ Params: { studentNumber: string } }>('/users/lookup/:studentNumber', async (request) => {

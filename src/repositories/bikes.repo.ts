@@ -1,7 +1,8 @@
 import { query, queryOne } from '../db';
+import { toPhoto, type PhotoColumns } from '../photos';
 import type { Bike, BikeStatus } from '../types';
 
-interface BikeRow {
+interface BikeRow extends PhotoColumns {
   bike_id: string;
   owner_user_id: string;
   name: string;
@@ -21,6 +22,7 @@ function toBike(row: BikeRow): Bike {
     name: row.name,
     makeModel: row.make_model,
     colour: row.colour,
+    photo: toPhoto(row),
     photoPath: row.photo_path,
     status: row.status,
     submittedAt: new Date(row.submitted_at).toISOString(),
@@ -73,7 +75,7 @@ export const bikesRepo = {
 
   async update(
     bikeId: string,
-    fields: Partial<{ name: string; makeModel: string; colour: string; photoPath: string }>,
+    fields: Partial<{ name: string; makeModel: string; colour: string }>,
   ): Promise<Bike | null> {
     const sets: string[] = [];
     const params: unknown[] = [];
@@ -89,10 +91,6 @@ export const bikesRepo = {
     if (fields.colour !== undefined) {
       sets.push(`colour = $${i++}`);
       params.push(fields.colour);
-    }
-    if (fields.photoPath !== undefined) {
-      sets.push(`photo_path = $${i++}`);
-      params.push(fields.photoPath);
     }
     if (sets.length === 0) return this.findById(bikeId);
     params.push(bikeId);

@@ -6,6 +6,7 @@ import { auditRepo } from '../repositories/audit.repo';
 import { bikesRepo } from '../repositories/bikes.repo';
 import { notificationsRepo } from '../repositories/notifications.repo';
 import { permissionsRepo } from '../repositories/permissions.repo';
+import { photosRepo } from '../repositories/photos.repo';
 import { tagsRepo } from '../repositories/tags.repo';
 import { usersRepo } from '../repositories/users.repo';
 import { savePhotoDataUrl } from '../uploads';
@@ -33,6 +34,8 @@ const grantPermissionSchema = z.object({
   name: z.string().trim().max(80).optional(),
 });
 
+const bikePhotoSchema = z.object({ photoDataUrl: z.string().min(1, 'Choose a photo to upload.') });
+
 async function requireBikeAccess(request: Parameters<typeof requireOwnerOrRoles>[0], bikeId: string) {
   const bike = await bikesRepo.findById(bikeId);
   if (!bike) throw ApiError.notFound('That bike no longer exists.');
@@ -55,6 +58,7 @@ export default async function bikesRoutes(app: FastifyInstance) {
     const owner = await usersRepo.findById(body.ownerUserId);
     if (!owner) throw ApiError.notFound('No student matches that number.');
 
+    const pendingPhotoUrl = body.photoDataUrl ? await savePhotoDataUrl(body.photoDataUrl, 'bikes', 'new') : null;
 
     const bike = await bikesRepo.create({
       ownerUserId: body.ownerUserId,
@@ -66,9 +70,9 @@ export default async function bikesRoutes(app: FastifyInstance) {
     });
 
     let finalBike = bike;
-    if (body.photoDataUrl) {
-      const photoPath = await savePhotoDataUrl(body.photoDataUrl, 'bikes', bike.bikeId);
-      finalBike = (await bikesRepo.update(bike.bikeId, { photoPath }))!;
+    if (pendingPhotoUrl) {
+      await photosRepo.submit('bike', bike.bikeId, pendingPhotoUrl);
+      finalBike = (await bikesRepo.findById(bike.bikeId))!;
     }
 
     await auditRepo.record({
@@ -94,15 +98,21 @@ export default async function bikesRoutes(app: FastifyInstance) {
     const bike = await requireBikeAccess(request, request.params.bikeId);
     const body = updateBikeSchema.parse(request.body);
 
-    let photoPath: string | undefined;
-    if (body.photoDataUrl) photoPath = await savePhotoDataUrl(body.photoDataUrl, 'bikes', bike.bikeId);
+    if (body.photoDataUrl && actor.userId !== bike.ownerUserId) {
+      throw ApiError.forbidden('Only the owner can submit a new bike photo.');
+    }
+    const pendingPhotoUrl = body.photoDataUrl ? await savePhotoDataUrl(body.photoDataUrl, 'bikes', bike.bikeId) : null;
 
-    const updated = await bikesRepo.update(bike.bikeId, {
+    let updated = await bikesRepo.update(bike.bikeId, {
       name: body.name,
       makeModel: body.makeModel,
       colour: body.colour,
-      photoPath,
     });
+    if (pendingPhotoUrl) {
+      await photosRepo.submit('bike', bike.bikeId, pendingPhotoUrl);
+      updated = await bikesRepo.findById(bike.bikeId);
+    }
+
     await auditRepo.record({
       actorUserId: actor.userId,
       action: 'registration.updated',
@@ -111,6 +121,25 @@ export default async function bikesRoutes(app: FastifyInstance) {
       detail: `Details updated for ${updated!.name}.`,
     });
     return toBikeView(updated!);
+  });
+
+    app.post<{ Params: { bikeId: string } }>('/bikes/:bikeId/photo', async (request) => {
+    const actor = request.requireAuth();
+    const bike = await bikesRepo.findById(request.params.bikeId);
+    if (!bike) throw ApiError.notFound('That bike no longer exists.');
+    if (actor.userId !== bike.ownerUserId) throw ApiError.forbidden('Only the owner can submit a new bike photo.');
+
+    const body = bikePhotoSchema.parse(request.body);
+    const pendingPhotoUrl = await savePhotoDataUrl(body.photoDataUrl, 'bikes', bike.bikeId);
+    await photosRepo.submit('bike', bike.bikeId, pendingPhotoUrl);
+    await auditRepo.record({
+      actorUserId: actor.userId,
+      action: 'bike.photo_submitted',
+      entityType: 'bike',
+      entityId: bike.bikeId,
+      detail: 'Bike photo submitted for review.',
+    });
+    return toBikeView((await bikesRepo.findById(bike.bikeId))!);
   });
 
   app.post<{ Params: { bikeId: string } }>('/bikes/:bikeId/submit', async (request) => {
