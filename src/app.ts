@@ -10,6 +10,7 @@ import { registerErrorHandler } from './errors';
 
 import authRoutes from './routes/auth.routes';
 import usersRoutes from './routes/users.routes';
+import bikesRoutes from './routes/bikes.routes';
 import photosRoutes from './routes/photos.routes';
 import registrationsRoutes from './routes/registrations.routes';
 import tagsRoutes from './routes/tags.routes';
@@ -72,7 +73,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     async (api) => {
       await api.register(authRoutes);
       await api.register(usersRoutes);
-      await api.register(photosRoutes)
+      await api.register(bikesRoutes);
+      await api.register(photosRoutes);
       await api.register(registrationsRoutes);
       await api.register(tagsRoutes);
       await api.register(gatesRoutes);
