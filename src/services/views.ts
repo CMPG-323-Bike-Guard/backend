@@ -112,6 +112,9 @@ export async function buildAlarmView(alarm: Alarm): Promise<AlarmView> {
   const tagBike = tag ? await bikesRepo.findById(tag.bikeId) : null;
   const registeredOwner = tagBike ? await usersRepo.findById(tagBike.ownerUserId) : null;
   const ownerBikes = presentedUser ? await listActiveBikesForOwner(presentedUser.userId) : [];
+    const acknowledgedByName = alarm.acknowledgedByUserId
+    ? (await usersRepo.findById(alarm.acknowledgedByUserId))?.name ?? null
+    : null;
   const resolvedByName = alarm.resolvedByUserId
     ? (await usersRepo.findById(alarm.resolvedByUserId))?.name ?? null
     : null;
@@ -124,6 +127,7 @@ export async function buildAlarmView(alarm: Alarm): Promise<AlarmView> {
     registeredOwner: withoutPending(registeredOwner),
     tagBike: withoutPending(tagBike),
     ownerBikes: ownerBikes.map((bike) => withoutPending(bike)),
+    acknowledgedByName,
     resolvedByName,
   };
 }

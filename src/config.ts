@@ -40,6 +40,8 @@ export const config = {
 
     scanDebounceMs: Number(process.env.SCAN_DEBOUNCE_MS ?? 3000),
 
+  alarmAckTimeoutMs: Number(process.env.ALARM_ACK_TIMEOUT_MS ?? 120_000),
+  alarmEscalationIntervalMs: Number(process.env.ALARM_ESCALATION_INTERVAL_MS ?? 5_000),
   gateMasterSecret: required('GATE_MASTER_SECRET', 'dev-gate-secret-change-me'),
   gateSigningRequired: process.env.GATE_SIGNING_REQUIRED
     ? process.env.GATE_SIGNING_REQUIRED === 'true'

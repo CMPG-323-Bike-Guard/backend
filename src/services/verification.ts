@@ -124,6 +124,7 @@ async function evaluateCrossing(
       mismatchReason = 'tag_reported_stolen';
       bikeId = tag.bikeId;
     } else {
+      bikeId = tag.bikeId;
       const bike = await bikesRepo.findById(tag.bikeId);
       const accountActive = !!person && person.accountStatus === 'active';
       const ownsIt = accountActive && !!bike && person.userId === bike.ownerUserId;
@@ -157,7 +158,7 @@ async function evaluateCrossing(
       note: null,
     });
 
-    const raised = isMatch ? null : await alarmsRepo.create(created.eventId);
+    const raised = isMatch ? null : await alarmsRepo.create(created.eventId, new Date(Date.now() + config.alarmAckTimeoutMs));
 
     await auditRepo.record({
       actorUserId: userId,

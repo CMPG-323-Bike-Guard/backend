@@ -3,6 +3,7 @@ import { bikesRepo } from '../repositories/bikes.repo';
 import { eventsRepo } from '../repositories/events.repo';
 import { gatesRepo } from '../repositories/gates.repo';
 import { usersRepo } from '../repositories/users.repo';
+import { isLiveAlarm } from '../types';
 import type { DashboardStats, GateEvent, MismatchReason, ReportBundle, RepeatMismatchRow, SeriesPoint } from '../types';
 
 function percentile(values: number[], fraction: number): number {
@@ -34,7 +35,7 @@ export async function buildStats(): Promise<DashboardStats> {
     crossingsToday: today.length,
     matchesToday: today.filter((event) => event.result === 'match').length,
     mismatchesToday: today.filter((event) => event.result === 'mismatch').length,
-    openAlarms: alarms.filter((alarm) => alarm.status === 'open' || alarm.status === 'escalated').length,
+    openAlarms: alarms.filter((alarm) => isLiveAlarm(alarm.status)).length,
     manualGates: gates.filter((gate) => gate.mode === 'manual').length,
     registeredBikes: bikes.filter((bike) => bike.status === 'active').length,
     pendingRegistrations: bikes.filter((bike) => bike.status === 'pending_approval').length,

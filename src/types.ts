@@ -14,7 +14,11 @@ export type MismatchReason =
   | 'tag_reported_lost'
   | 'tag_reported_stolen'
   | 'incomplete_read';
-export type AlarmStatus = 'open' | 'escalated' | 'cleared_in_person' | 'reported_stolen';
+export type AlarmStatus = 'pending' | 'acknowledged' | 'escalated' | 'cleared_in_person' | 'reported_stolen';
+export type AlarmResolution = Extract<AlarmStatus, 'cleared_in_person' | 'reported_stolen'>;
+export type EscalationReason = 'no_acknowledgement' | 'guard_request';
+export const LIVE_ALARM_STATUSES: readonly AlarmStatus[] = ['pending', 'acknowledged', 'escalated'];
+export const isLiveAlarm = (status: AlarmStatus): boolean => LIVE_ALARM_STATUSES.includes(status);
 export type CrossingSource = 'automated' | 'manual_entry' | 'guard_override';
 export type NotificationKind = 'tag_ready' | 'registration' | 'security' | 'photo_review' | 'system';
 export type PhotoStatus = 'none' | 'pending' | 'approved' | 'rejected';
@@ -111,8 +115,12 @@ export interface Alarm {
   alarmId: string;
   eventId: string;
   status: AlarmStatus;
-  raisedAt: string;
+    raisedAt: string;
+  acknowledgeBy: string;
+  acknowledgedAt: string | null;
+  acknowledgedByUserId: string | null;
   escalatedAt: string | null;
+  escalationReason: EscalationReason | null;
   resolvedByUserId: string | null;
   resolvedAt: string | null;
   notes: string | null;
@@ -163,6 +171,7 @@ export interface AlarmView {
   registeredOwner: User | null;
   tagBike: Bike | null;
   ownerBikes: Bike[];
+  acknowledgedByName: string | null;
   resolvedByName: string | null;
 }
 
@@ -227,4 +236,5 @@ export type RealtimeEvent =
   | { type: 'crossing'; crossing: CrossingView }
   | { type: 'alarm'; alarm: AlarmView }
   | { type: 'alarm-updated'; alarm: AlarmView }
+  | { type: 'alarm-escalated'; alarm: AlarmView }
   | { type: 'gate'; gate: Gate };
