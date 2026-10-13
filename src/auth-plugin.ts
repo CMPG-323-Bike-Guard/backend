@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { config } from './config';
 import { ApiError } from './errors';
+import { usersRepo } from './repositories/users.repo';
 import type { Role, User } from './types';
 
 export interface AuthedUser {
@@ -34,7 +35,10 @@ export const authPlugin = fp(async (app: FastifyInstance) => {
     if (!token) return;
     try {
       const payload = jwt.verify(token, config.jwtSecret) as { sub: string; role: Role };
-      request.authUser = { userId: payload.sub, role: payload.role };
+      const state = await usersRepo.findAuthState(payload.sub);
+      if (state && state.accountStatus === 'active') {
+        request.authUser = { userId: payload.sub, role: state.role };
+      }
     } catch {
 
     }

@@ -90,4 +90,36 @@ export const usersRepo = {
   async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
     await query('UPDATE users SET password_hash = $2 WHERE user_id = $1', [userId, passwordHash]);
   },
+
+    async findAuthState(userId: string): Promise<{ role: Role; accountStatus: AccountStatus } | null> {
+    const row = await queryOne<{ role: Role; account_status: AccountStatus }>(
+      'SELECT role, account_status FROM users WHERE user_id = $1',
+      [userId],
+    );
+    return row ? { role: row.role, accountStatus: row.account_status } : null;
+  },
+
+  async adminUpdate(
+    userId: string,
+    fields: { studentNumber: string; name: string; email: string; phone: string | null; role: Role },
+  ): Promise<User | null> {
+    const row = await queryOne<UserRow>(
+      `UPDATE users SET student_number = $2, name = $3, email = $4, phone = $5, role = $6
+        WHERE user_id = $1 RETURNING *`,
+      [userId, fields.studentNumber, fields.name, fields.email, fields.phone, fields.role],
+    );
+    return row ? toUser(row) : null;
+  },
+
+  async setAccountStatus(userId: string, status: AccountStatus): Promise<User | null> {
+    const row = await queryOne<UserRow>('UPDATE users SET account_status = $2 WHERE user_id = $1 RETURNING *', [
+      userId,
+      status,
+    ]);
+    return row ? toUser(row) : null;
+  },
+
+  async remove(userId: string): Promise<void> {
+    await query('DELETE FROM users WHERE user_id = $1', [userId]);
+  },
 };

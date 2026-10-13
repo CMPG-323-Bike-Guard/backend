@@ -6,12 +6,13 @@ import { bikesRepo } from '../repositories/bikes.repo';
 import { notificationsRepo } from '../repositories/notifications.repo';
 import { usersRepo } from '../repositories/users.repo';
 import { toBikeViews } from '../services/views';
-import { withTransaction } from '../db';
+import { query, withTransaction } from '../db';
 import { auditRepo } from '../repositories/audit.repo';
 import { hashPassword, verifyPassword } from '../security';
 import { config } from '../config';
 import { withoutPending } from '../photos';
 import { photosRepo } from '../repositories/photos.repo';
+import type { Role } from '../types';
 import { savePhotoDataUrl } from '../uploads';
 
 const createUserSchema = z.object({
@@ -41,6 +42,30 @@ function parseOwnDetails(body: unknown) {
     throw new ApiError(400, 'invalid_phone', 'Enter a valid phone number.', 'phone');
   }
   return { name, email, phone: phone || null };
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ROLES: Role[] = ['student', 'guard', 'admin'];
+
+function parseAdminEdit(body: unknown) {
+  const details = parseOwnDetails(body);
+  const input = (body ?? {}) as { studentStaffNumber?: unknown; role?: unknown };
+  const studentNumber = typeof input.studentStaffNumber === 'string' ? input.studentStaffNumber.trim() : '';
+  if (!/^\d{8}$/.test(studentNumber)) {
+    throw new ApiError(400, 'invalid_student_number', 'A student or staff number is 8 digits.', 'studentStaffNumber');
+  }
+  if (typeof input.role !== 'string' || !ROLES.includes(input.role as Role)) {
+    throw new ApiError(400, 'invalid_role', 'Choose a role.', 'role');
+  }
+  return { ...details, studentNumber, role: input.role as Role };
+}
+
+async function requireManageableUser(request: FastifyRequest<{ Params: { userId: string } }>, actorUserId: string) {
+  const { userId } = request.params;
+  if (!UUID_PATTERN.test(userId)) throw ApiError.notFound('That person no longer exists.');
+  const target = await usersRepo.findById(userId);
+  if (!target) throw ApiError.notFound('That person no longer exists.');
+  return { target, isSelf: target.userId === actorUserId };
 }
 
 export default async function usersRoutes(app: FastifyInstance) {
@@ -85,6 +110,117 @@ export default async function usersRoutes(app: FastifyInstance) {
       }
       throw err;
     }
+  });
+
+    app.patch<{ Params: { userId: string } }>('/users/:userId', async (request) => {
+    const actor = request.requireRole('admin');
+    const { target, isSelf } = await requireManageableUser(request, actor.userId);
+    const fields = parseAdminEdit(request.body);
+
+    if (isSelf && fields.role !== target.role) {
+      throw new ApiError(400, 'cannot_change_own_role', 'You cannot change your own role.', 'role');
+    }
+
+    try {
+      return await withTransaction(async () => {
+        const updated = await usersRepo.adminUpdate(target.userId, fields);
+        if (!updated) throw ApiError.notFound('That person no longer exists.');
+        if (fields.studentNumber !== target.studentStaffNumber) {
+          await query(
+            'UPDATE bike_permissions SET authorised_student_number = $2 WHERE authorised_user_id = $1',
+            [target.userId, fields.studentNumber],
+          );
+        }
+        await auditRepo.record({
+          actorUserId: actor.userId,
+          action: 'user.updated',
+          entityType: 'user',
+          entityId: target.userId,
+          detail: `${updated.name} (${updated.role}, ${updated.studentStaffNumber}) was edited.`,
+        });
+        return updated;
+      });
+    } catch (err) {
+      const pgError = err as { code?: string; constraint?: string };
+      if (pgError.code === '23505') {
+        if (pgError.constraint === 'users_email_key') {
+          throw ApiError.conflict('That email address is already in use.', 'email');
+        }
+        if (pgError.constraint === 'users_student_number_key') {
+          throw ApiError.conflict('Someone with that student or staff number already exists.', 'studentStaffNumber');
+        }
+      }
+      throw err;
+    }
+  });
+
+  app.post<{ Params: { userId: string } }>('/users/:userId/deactivate', async (request) => {
+    const actor = request.requireRole('admin');
+    const { target, isSelf } = await requireManageableUser(request, actor.userId);
+    if (isSelf) throw new ApiError(400, 'cannot_modify_self', 'You cannot deactivate your own account.');
+    if (target.accountStatus === 'suspended') return target;
+
+    const reason = (request.body as { reason?: unknown } | null | undefined)?.reason;
+    const note = typeof reason === 'string' && reason.trim() ? ` Reason: ${reason.trim()}` : '';
+    return withTransaction(async () => {
+      const updated = await usersRepo.setAccountStatus(target.userId, 'suspended');
+      await auditRepo.record({
+        actorUserId: actor.userId,
+        action: 'user.deactivated',
+        entityType: 'user',
+        entityId: target.userId,
+        detail: `${target.name}'s account was deactivated.${note}`,
+      });
+      return updated!;
+    });
+  });
+
+  app.post<{ Params: { userId: string } }>('/users/:userId/reactivate', async (request) => {
+    const actor = request.requireRole('admin');
+    const { target } = await requireManageableUser(request, actor.userId);
+    if (target.accountStatus === 'active') return target;
+
+    return withTransaction(async () => {
+      const updated = await usersRepo.setAccountStatus(target.userId, 'active');
+      await auditRepo.record({
+        actorUserId: actor.userId,
+        action: 'user.reactivated',
+        entityType: 'user',
+        entityId: target.userId,
+        detail: `${target.name}'s account was reactivated.`,
+      });
+      return updated!;
+    });
+  });
+
+  app.delete<{ Params: { userId: string } }>('/users/:userId', async (request, reply) => {
+    const actor = request.requireRole('admin');
+    const { target, isSelf } = await requireManageableUser(request, actor.userId);
+    if (isSelf) throw new ApiError(400, 'cannot_modify_self', 'You cannot remove your own account.');
+
+    try {
+      await withTransaction(async () => {
+        await auditRepo.record({
+          actorUserId: actor.userId,
+          action: 'user.removed',
+          entityType: 'user',
+          entityId: target.userId,
+          detail: `${target.name} (${target.role}, ${target.studentStaffNumber}) was removed.`,
+        });
+        await usersRepo.remove(target.userId);
+      });
+    } catch (err) {
+      if ((err as { code?: string }).code === '23503') {
+        throw new ApiError(
+          409,
+          'has_records',
+          `${target.name} still has bikes or other records, so they cannot be removed. Deactivate them instead.`,
+        );
+      }
+      throw err;
+    }
+    reply.status(204);
+    return reply.send();
   });
 
     app.patch('/users/me', async (request) => {
