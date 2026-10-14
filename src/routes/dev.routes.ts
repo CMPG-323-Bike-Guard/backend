@@ -10,8 +10,15 @@ const simulateSchema = z.object({
   debounce: z.boolean().default(false),
 });
 
+export const SIMULATED_NOTE = 'Simulated crossing (reader emulator)';
+
 export default async function devRoutes(app: FastifyInstance) {
-  if (config.isProduction) return;
+  app.get('/dev/simulator-status', async (request) => {
+    request.requireAuth();
+    return { enabled: config.simulatorEnabled };
+  });
+
+  if (!config.simulatorEnabled) return;
 
   app.post('/dev/simulate-crossing', async (request) => {
     request.requireRole('guard', 'admin');
@@ -22,6 +29,7 @@ export default async function devRoutes(app: FastifyInstance) {
       tagUid: body.tagUid,
       source: 'automated',
       debounce: body.debounce,
+      note: SIMULATED_NOTE,
     });
   });
 }

@@ -20,6 +20,7 @@ export interface CrossingInput {
   tagUid?: string | null;
   source?: 'automated' | 'manual_entry' | 'guard_override';
   debounce?: boolean;
+  note?: string | null;
 }
 
 export interface CrossingOutcome {
@@ -63,7 +64,8 @@ export async function processCrossing(input: CrossingInput): Promise<CrossingOut
   const source = input.source ?? 'automated';
   const debounce = source === 'automated' && input.debounce !== false && config.scanDebounceMs > 0;
 
-  if (!debounce) return evaluateCrossing(input.gateId, studentNumber, tagUid, source);
+  const note = input.note ?? null;
+  if (!debounce) return evaluateCrossing(input.gateId, studentNumber, tagUid, source, note);
 
   const now = Date.now();
   pruneRecentScans(now);
@@ -74,7 +76,7 @@ export async function processCrossing(input: CrossingInput): Promise<CrossingOut
     return { ...outcome, duplicate: true };
   }
 
-  const promise = evaluateCrossing(input.gateId, studentNumber, tagUid, source);
+  const promise = evaluateCrossing(input.gateId, studentNumber, tagUid, source, note);
   recentScans.set(key, { at: now, promise });
   try {
     return await promise;
@@ -88,7 +90,8 @@ async function evaluateCrossing(
   gateId: string,
   studentNumber: string | null,
   tagUid: string | null,
-  source: NonNullable<CrossingInput['source']>,
+    source: NonNullable<CrossingInput['source']>,
+  note: string | null,
 ): Promise<CrossingOutcome> {
   const startedAt = Date.now();
   const gate = await gatesRepo.findById(gateId);
@@ -155,7 +158,7 @@ async function evaluateCrossing(
       guardUserId: null,
       verificationMs,
       offline: false,
-      note: null,
+      note,
     });
 
     const raised = isMatch ? null : await alarmsRepo.create(created.eventId, new Date(Date.now() + config.alarmAckTimeoutMs));

@@ -40,6 +40,9 @@ export const config = {
 
     scanDebounceMs: Number(process.env.SCAN_DEBOUNCE_MS ?? 3000),
 
+  simulatorEnabled: process.env.ENABLE_SIMULATOR
+  ? process.env.ENABLE_SIMULATOR === 'true'
+  : process.env.NODE_ENV !== 'production',
   alarmAckTimeoutMs: Number(process.env.ALARM_ACK_TIMEOUT_MS ?? 120_000),
   alarmEscalationIntervalMs: Number(process.env.ALARM_ESCALATION_INTERVAL_MS ?? 5_000),
   gateMasterSecret: required('GATE_MASTER_SECRET', 'dev-gate-secret-change-me'),
