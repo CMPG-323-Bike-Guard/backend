@@ -10,3 +10,6 @@ src/**/*.js
 tests/**/*.js
 scripts/**/*.js
 vitest.config.js
+tools/card-bridge/.env.bridge
+tools/card-bridge/__pycache__/
+tools/card-bridge/cards.json
