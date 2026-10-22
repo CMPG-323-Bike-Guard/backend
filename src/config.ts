@@ -56,6 +56,8 @@ export const config = {
   loginRateLimitMax: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 5),
   loginRateLimitWindow: process.env.LOGIN_RATE_LIMIT_WINDOW ?? '1 minute',
   trustProxy: process.env.TRUST_PROXY === 'true',
+
+    cardBridgeKey: process.env.CARD_BRIDGE_KEY ?? '',
 };
 
 if (config.isProduction) {

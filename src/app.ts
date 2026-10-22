@@ -19,6 +19,7 @@ import crossingsRoutes from './routes/crossings.routes';
 import alarmsRoutes from './routes/alarms.routes';
 import reportingRoutes from './routes/reporting.routes';
 import devRoutes from './routes/dev.routes';
+import cardsRoutes from './routes/cards.routes';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -82,6 +83,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await api.register(alarmsRoutes);
       await api.register(reportingRoutes);
       await api.register(devRoutes);
+      await api.register(cardsRoutes);
     },
     { prefix: config.apiPrefix },
   );

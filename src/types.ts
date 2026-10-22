@@ -237,4 +237,5 @@ export type RealtimeEvent =
   | { type: 'alarm'; alarm: AlarmView }
   | { type: 'alarm-updated'; alarm: AlarmView }
   | { type: 'alarm-escalated'; alarm: AlarmView }
-  | { type: 'gate'; gate: Gate };
+  | { type: 'gate'; gate: Gate }
+  | { type: 'card-tap'; gateId?: string; studentNumber: string | null; cardRef: string };
